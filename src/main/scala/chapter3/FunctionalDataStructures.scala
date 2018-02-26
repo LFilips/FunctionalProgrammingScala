@@ -102,32 +102,32 @@ object List { // `List` companion object. Contains functions for creating and wo
   }
 
   /**
+    * The fold right function is used to apply a function recursively to the element of the list.
+    * The input function is of type (A,B) => B, so an example of stack trace of it is the following:
+    * f(head, f(head, f(head, z)), in case the function is a sum (_+_)in a list of Int, with 0 as z
+    * So is called in this way     foldRight(list, 0)((x,y) => x+y)
     *
-    * @param list
-    * @param z
-    * @param f
-    * @tparam A
-    * @tparam B
-    * @return
+    * sum(1, sum(2, sum(3, 0))) -> 6
+    *
     */
   def foldRight[A, B](list: List[A], z: B)(f: (A, B) => B): B = list match {
     case Nil => z
     case Cons(head, tail) => f(head, foldRight(tail, z)(f))
   }
 
-  def foldRightUsingFoldLeft[A, B](list: List[A], z: B)(f: (A, B) => B): B =  {
-    val g: (B, A) => B = (a,b) => f(b, a)
-    foldLeft(list,z)(g)
+  def foldRightUsingFoldLeft[A, B](list: List[A], z: B)(f: (A, B) => B): B = {
+    val g: (B, A) => B = (a, b) => f(b, a)
+    foldLeft(reverse(list), z)(g) //Need to be reverted!!
   }
 
-  def foldLeftUsingFoldRight[A, B](as: List[A], z: B)(f: (B, A) => B): B  =  {
-    foldRight(as,z)((a,b) => f(b, a))
+  def foldLeftUsingFoldRight[A, B](as: List[A], z: B)(f: (B, A) => B): B = {
+    foldRight(as, z)((a, b) => f(b, a))
   }
 
   @annotation.tailrec
-  def foldLeft[A, B](as: List[A], z: B)(f: (B, A) => B): B = as match{
+  def foldLeft[A, B](as: List[A], z: B)(f: (B, A) => B): B = as match {
     case Nil => z
-    case Cons(head,tail) => foldLeft(tail,f(z,head))(f)
+    case Cons(head, tail) => foldLeft(tail, f(z, head))(f)
   }
 
   /*
@@ -167,7 +167,7 @@ object List { // `List` companion object. Contains functions for creating and wo
   }
 
   def sumFoldedLeft(list: List[Int]) = {
-    foldLeft(list,0)(_ + _)
+    foldLeft(list, 0)(_ + _)
   }
 
   def productFoldedLeft(list: List[Double]) = {
@@ -179,22 +179,172 @@ object List { // `List` companion object. Contains functions for creating and wo
   }
 
 
-  def reverse[A](list: List[A]) : List[A] = {
+  def reverse[A](list: List[A]): List[A] = {
+    @annotation.tailrec
+    def recursiveReverse[A](list: List[A], buffer: List[A]): List[A] = list match {
+      case Nil => buffer
+      case Cons(head, tail) => recursiveReverse(tail, Cons(head, buffer))
+    }
+    recursiveReverse(list, Nil)
+  }
+
+  /**
+    *
+    * Append a list to another
+    *
+    * @param list         the base list
+    * @param listToAppend the list to appen
+    * @tparam A the list
+    * @return
+    */
+  def append[A](list: List[A], listToAppend: List[A]): List[A] = list match {
+    case Nil => listToAppend
+    case Cons(head, tail) => Cons(head, append(tail, listToAppend))
+  }
+
+  /**
+    * Exercise 3.15
+    * Hard: Write a function that concatenates a list of lists into a single list. Its runtime should be linear in the total
+    * length of all lists. Try to use functions we have already defined.
+    */
+
+
+  def concatenates[A](list: List[List[A]]): List[A] = {
 
     @annotation.tailrec
-    def recursiveReverse[A](list: List[A],buffer: List[A]) : List[A] = list match {
-      case Nil => buffer
-      case Cons(head,tail) => recursiveReverse(tail,Cons(head,buffer))
+    def concatenatesHelper(list: List[List[A]], flattenedList: List[A]): List[A] = list match {
+      case Nil => flattenedList
+      case Cons(_, Nil) => flattenedList
+      case Cons(head, Cons(secondHead, tail)) => concatenatesHelper(tail, append(head, secondHead))
     }
-    recursiveReverse(list,Nil)
+
+    concatenatesHelper(list, Nil)
+  }
+
+  /**
+    * Exercise 3.16
+    * Write a function that transforms a list of integers by adding 1 to each element. (Reminder: this should be a pure function that returns a new List!)
+    *
+    * I should use the fold list to preform this operation
+    *
+    * f(head, f(head, f(head, z)) is how the function will be developed
+    *
+    * The z element will be for sure a Nil list
+    *
+    * f(head,f(head,f(head,Nil)))
+    *
+    * I can piggyback the append function
+    *
+    * This structure is the same of the constructor that I've got for the list Cons(1,Cons(2,Cons(3,Nil)
+    *
+    * The only think is that each element need to be the element on the input list +1
+    *
+    * so the natural definition for the add1 method is something like: foldRight(list)((x,y) => Cons(x+1,y)
+    *
+    */
+
+  def add1ToAll(list: List[Int]): List[Int] = {
+    foldRightUsingFoldLeft(list, Nil: List[Int])((h, t) => Cons(h + 1, t))
 
   }
 
-  //todo
-  def append[A](list: List[A]) : List[A] = {
-    Nil
+  def doubleToString(list: List[Double]): List[String] = {
+    foldRightUsingFoldLeft(list, Nil: List[String])((h, t) => Cons(h.toString, t))
   }
 
+
+  /**
+    * Exercise 3.18
+    * Write a function map that generalizes modifying each element in a list while maintaining the structure of the list. Here is its signature:[12]
+    *
+    * 12 In the standard library, map and flatMap are methods of List.
+    */
+  def map[A, B](as: List[A])(f: A => B): List[B] = {
+    foldRightUsingFoldLeft(as, Nil: List[B])((head, tail) => Cons(f(head), tail))
+  }
+
+  /**
+    * Exercise 3.19
+    * Write a function filter that removes elements from a list unless they satisfy a given predicate. Use it to remove all odd numbers from a List[Int].
+    *
+    *
+    * This function can probablu be define in term of folding too
+    *
+    * f(head,f(head,f(head,Nil))
+    *
+    * The output will be a list, so the z element of the fold will a Nil list
+    *
+    * f(a,f(b,f(c,Nil)) what I need to do is if b doesn't satisfy the predicate this should become f(a,f(c,Nil)
+    *
+    * fold(list)((x,y) => if f(a) Cons(x,y) else tail
+    *
+    */
+
+  def filter[A](as: List[A])(f: A => Boolean): List[A] = {
+    foldRightUsingFoldLeft(as, Nil: List[A])((head, tail) => if (f(head)) Cons(head, tail) else tail)
+  }
+
+  /**
+    * Write a function flatMap that works like map except that the function given will return a list instead of a single
+    * result, and that list should be inserted into the final resulting list. Here is its signature:
+    *
+    */
+
+  def flatMap[A, B](as: List[A])(f: A => List[B]): List[B] = {
+    foldRightUsingFoldLeft(as, Nil: List[B])((head, tail) => append(f(head), tail))
+  }
+
+  def filterWithFlatMap[A](as: List[A])(f: A => Boolean): List[A] = {
+    flatMap(as)((x) => if (f(x)) Cons(x, Nil) else Nil)
+  }
+
+}
+
+sealed trait Tree[+A]
+
+case class Leaf[A](value: A) extends Tree[A]
+
+case class Branch[A](left: Tree[A], right: Tree[A]) extends Tree[A]
+
+
+object Tree {
+
+  //usually tree are traversed recursevily on left and right
+  def size[A](tree: Tree[A]): Int = tree match {
+    case Leaf(_) => 1
+    case Branch(left, right) => 1 + size(left) + size(right)
+  }
+
+  def maximum(tree: Tree[Int]): Int = {
+
+    def recMaximum(tree: Tree[Int], max: Int): Int = tree match {
+      case Leaf(x) => x
+      case Branch(left, right) => recMaximum(left, max).max(recMaximum(right, max))
+    }
+
+    recMaximum(tree, Int.MinValue) //would be better to use one of the element as first max
+  }
+
+  def depth[A](tree: Tree[A]): Int = tree match {
+    case Leaf(_) => 1
+    case Branch(left, right) => 1 + depth(left).max(depth(right))
+  }
+
+
+  def map[A, B](tree: Tree[A])(f: (A) => B) : Tree[B] = tree match {
+    case Leaf(x) => Leaf(f(x))
+    case Branch(left, right) => Branch[B](map(left)(f),map(right)(f))
+  }
+
+
+  def fold[A, B](tree: Tree[A])(g: (B,B) => B)(f: A => B) : B = tree match {
+    case Leaf(x) => f(x)
+    case Branch(left, right) => g(fold(left)(g)(f),fold(right)(g)(f))
+  }
+
+  def maximumFolded(tree: Tree[Int]) : Int = {
+    fold[Int,Int](tree)(_ max _)((a) => (a))
+  }
 
 }
 
