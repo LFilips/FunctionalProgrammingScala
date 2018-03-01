@@ -42,7 +42,7 @@ case object None extends Option[Nothing]
 object Option {
 
   /**
-    * THIS DON'T WORK
+    * This fail for none value
     *
     * I have a list of option tha need to become an option containing a list
     *
@@ -87,6 +87,38 @@ object Option {
     case Nil => Some(Nil)
     case head :: tail => head.flatMap((x) => sequenceUsingFlatMap(tail).map((y) => x :: y))
   }
+
+  /**
+    * Sometimes we’ll want to map over a list using a function that might fail, returning None if applying it to any element
+    * of the list returns None. For example, what if we have a whole list of String values that we wish to parse to Option[Int]?
+    */
+  def parseInts(list: List[String]) : Option[List[Int]] = list match {
+    case Nil => Some(Nil)
+    case h :: t => Chapter4.Try(h.toInt).flatMap((head) => parseInts(t).map( (tailHead) => head :: tailHead))
+  }
+
+  /**
+    *
+    * How this works??
+    *
+    * If I have one parsing error, the Try will result in a None, so the function flatMap will result in a None stopping the recursion and giving back a none
+    *
+    *
+    * Let explode what is happening in this function with List("1","2","3")
+    *
+    * "1" :: List("2","3")  => Try("1".toInt).flatMap(( "1" => parseInt(List("2","3").map( (tailHead) => 1 :: tailHead))
+    * "2" :: List("3")      => Try("2".toInt).flatMap(( "2" => parseInt(List("3").map( (tailHead) => 3 :: tailHead))
+    * "3" :: List()         => Try("3".toInt).flatMap(( "3" => parseInt(List()).map( (tailHead) => 3 :: tailHead))
+    *  Nil                  => None //now we go back
+    *  "3" :: List()         => Try("3".toInt).flatMap(( "3" => Some(Nil).map( (Nil) => 3 :: Nil))  ---> Option[List[Int]]
+    *
+    *  This is the key moment, when the Option is converted to the list using the map appending the element to a Nil Some(Nil).map( (x) => 3 ::: Nil)
+    *  "2" :: List("3")      => Try("2".toInt).flatMap(( "2" => Option(List(3)).map( (List(3) => 2 :: List(3))
+    *  "1" :: List("2","3")  => Try("1".toInt).flatMap(( "1" => List(2,3).map( (tailHead) => 1 :: List(2,3)))
+    *  "1" :: List("2","3")  => Try("1".toInt).flatMap(( "1" => List(2,3).map( (tailHead) => 1 :: List(2,3)))  --> Option(List(1,2,3))
+    *
+    */
+
 
 }
 
