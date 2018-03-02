@@ -72,4 +72,37 @@ class EitherTest extends FlatSpec with Matchers {
 
   }
 
+  "the sequence method" should "create an Either cointainig a List of all the either value, if all are right" in {
+
+    val eitherList : List[Either[String,Int]] = List(Right(1),Right(2),Right(3),Right(4))
+
+    Either.sequence(eitherList) should be(Right(List(1,2,3,4)))
+
+  }
+
+  it should "create an Either cointaining the first error encountered in the list" in {
+
+    val eitherList : List[Either[String,Int]] = List(Right(1),Left("error"),Right(3),Right(4))
+
+    Either.sequence(eitherList) should be(Left("error"))
+
+  }
+
+  "the traverse method" should "traverse the list of Either applyng the fucntion that can fail, and if succeed give a list of result" in {
+
+    val eitherList : List[String] = List("1","2","3","4")
+
+    Either.traverse(eitherList)((a) => Either.Try(a.toInt) ) should be(Right(List(1,2,3,4)))
+
+  }
+
+  it should "give the first error encountered in the function than can create an either" in {
+
+    val eitherList : List[String] = List("1","Hello","3","4")
+
+    Either.traverse(eitherList)((a) => Either.Try(a.toInt) ) should be(Left(List(1,2,3,4))) //todo fix this, I shoiuld assert on the exception
+
+
+  }
+
 }

@@ -119,6 +119,17 @@ object Option {
     *
     */
 
+  def parseIntsUsingSequence(list: List[String]) : Option[List[Int]] = sequenceUsingFlatMap(list.map((x) => Chapter4.Try(x.toInt)))
+
+  /**
+    *
+    * Generic function for execution a function that can fail on a list and produce and Option with the list if always succeded
+    *
+    */
+  def traverse[A, B](a: List[A])(f: A => Option[B]): Option[List[B]] = a match {
+    case Nil => Some(Nil) //base case, we want to appen this Nil list to the last element using the :: operator
+    case head :: tail => f(head).flatMap((head) => traverse(tail)(f).map((x) => head :: x))
+  }
 
 }
 

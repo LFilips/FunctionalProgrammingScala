@@ -58,6 +58,4 @@ class TreeTest extends FlatSpec with Matchers {
 
   }
 
-  List(1,2,3).fold()
-
 }

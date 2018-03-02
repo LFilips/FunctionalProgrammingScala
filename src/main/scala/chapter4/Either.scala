@@ -21,7 +21,6 @@ sealed trait Either[+E, +A] {
     case Right(x) => Right(f(x))
     case Left(x) => Left(x)
   }
-
   /**
     *
     * orElse method, it should give the value if present otherwise another
@@ -42,11 +41,38 @@ sealed trait Either[+E, +A] {
     case Left(a) => Left(a)
     case Right(a) => b.map((b) => f(a, b))
   }
+
+
 }
 
 case class Left[+E](value: E) extends Either[E, Nothing]
 
 case class Right[+A](value: A) extends Either[Nothing, A]
+
+object Either {
+
+
+  def Try[A](a: => A): Either[Exception,A] = {
+    try Right(a)
+    catch {
+      case e: Exception => Left(e)
+    }
+  }
+
+  /**
+    * The sequence method, should create an Either that contain a list of all the value that Right in the list provided as input
+    *
+    */
+  def sequence[E, A](es: List[Either[E, A]]): Either[E, List[A]] = es match {
+    case Nil => Right(Nil)
+    case head :: tail => head.flatMap((headEither) => sequence(tail).map((tailHead) => headEither :: tailHead) )
+  }
+
+  def traverse[E, A, B](as: List[A])(f: A => Either[E, B]): Either[E, List[B]] = as match {
+    case Nil => Right(Nil)
+    case head :: tail => f(head).flatMap((headEither) => traverse(tail)(f).map((tailHead) => headEither :: tailHead))
+  }
+}
 
 
 
