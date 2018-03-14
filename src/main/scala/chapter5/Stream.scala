@@ -65,7 +65,7 @@ trait Stream[+A] {
     *
     */
   def takeWhileFolded(p: A => Boolean): Stream[A] = {
-    foldRight(Empty: Stream[A])((x,y) => if (p(x)) cons(x,y) else Empty )
+    foldRight(Empty: Stream[A])((x, y) => if (p(x)) cons(x, y) else Empty)
   }
 
   def foldRight[B](z: => B)(f: (A, => B) => B): B = this match {
@@ -173,11 +173,10 @@ object Stream {
     *
     */
 
-  /**
-  def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] = f(z).map((t) => t._1) match {
-    case None => empty[A]
-    case Some(x) => cons(x, unfold(f(z).map((t) => t._2))(f))
-  }*/
+  def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] = f(z) match { //matching using the function, so if the next state exist I'll do that, otherwise return an Empty stream
+    case Some(_) => cons(f(z).map((t) => t._1).get, unfold(f(z).map((t) => t._2).get)(f))
+    case _ => empty
+  }
 
 }
 
