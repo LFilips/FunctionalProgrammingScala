@@ -13,7 +13,7 @@ class FunctionalDataStructureTest extends FlatSpec with Matchers {
 
     val result = tail(list)
 
-    result should be(Cons(2,Cons(3,Nil)))
+    result should be(List(2,3))
 
   }
 

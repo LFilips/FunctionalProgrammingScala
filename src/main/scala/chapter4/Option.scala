@@ -127,7 +127,7 @@ object Option {
     *
     */
   def traverse[A, B](a: List[A])(f: A => Option[B]): Option[List[B]] = a match {
-    case Nil => Some(Nil) //base case, we want to appen this Nil list to the last element using the :: operator
+    case Nil => Some(Nil) //base case, we want to append this Nil list to the last element using the :: operator
     case head :: tail => f(head).flatMap((head) => traverse(tail)(f).map((x) => head :: x))
   }
 

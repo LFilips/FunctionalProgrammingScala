@@ -100,7 +100,7 @@ class EitherTest extends FlatSpec with Matchers {
 
     val eitherList : List[String] = List("1","Hello","3","4")
 
-    Either.traverse(eitherList)((a) => Either.Try(a.toInt) ) should be(Left(List(1,2,3,4))) //todo fix this, I shoiuld assert on the exception
+    Either.traverse(eitherList)((a) => Either.Try(a.toInt) ) shouldBe a [Left[Exception]]
 
 
   }

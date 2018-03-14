@@ -21,12 +21,13 @@ sealed trait Either[+E, +A] {
     case Right(x) => Right(f(x))
     case Left(x) => Left(x)
   }
+
   /**
     *
     * orElse method, it should give the value if present otherwise another
     *
     */
-  def orElse[E, B >: A](e: => Either[E, B]): Either[E, B] = this match {
+  def orElse[EE >: E, B >: A](e: => Either[EE, B]): Either[EE, B] = this match {
     case Right(x) => Right(x)
     case Left(_) => e
   }
@@ -52,7 +53,7 @@ case class Right[+A](value: A) extends Either[Nothing, A]
 object Either {
 
 
-  def Try[A](a: => A): Either[Exception,A] = {
+  def Try[A](a: => A): Either[Exception, A] = {
     try Right(a)
     catch {
       case e: Exception => Left(e)
@@ -65,7 +66,7 @@ object Either {
     */
   def sequence[E, A](es: List[Either[E, A]]): Either[E, List[A]] = es match {
     case Nil => Right(Nil)
-    case head :: tail => head.flatMap((headEither) => sequence(tail).map((tailHead) => headEither :: tailHead) )
+    case head :: tail => head.flatMap((headEither) => sequence(tail).map((tailHead) => headEither :: tailHead))
   }
 
   def traverse[E, A, B](as: List[A])(f: A => Either[E, B]): Either[E, List[B]] = as match {
