@@ -110,6 +110,96 @@ trait Stream[+A] {
     foldRight(Empty: Stream[B])((a, b) => f(a).append(b))
   }
 
+  /**
+    * Exercise 5.13
+    * Use unfold to implement map, take, takeWhile, zipWith (as in chapter 3), and zipAll. The zipAll function should
+    * continue the traversal as long as either stream has more elements—it uses Option to indicate whether each stream
+    * has been exhausted.
+    */
+
+  def mapUnfold[B](f: A => B): Stream[B] = {
+    //  def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A]
+    val mapping = (s: Stream[A]) => s match {
+      case Cons(head, tail) => Some((f(head()), tail()))
+      case Empty => None
+    }
+    Stream.unfold(this)(mapping) //the first state is the list, then each state is compose from the tail and the value
+    // is obtained applying the map function
+  }
+
+  /** This time the state is composed from the Stream and the n value,
+    * each actual element is the head of the list, untile n is greater than zero */
+
+  def takeUnfold(n: Int): Stream[A] = {
+    //  def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A]
+    val mapping = (state: (Stream[A], Int)) => state match {
+      case (Cons(head, tail), n) if n > 0 => Some(head(), (tail(), n - 1))
+      case (Cons(_, _), n) if n == 0 => None
+      case (Empty, _) => None
+    }
+    Stream.unfold((this, n))(mapping)
+  }
+
+
+  /**
+    * this time the state is composed only by the stream
+    * each actual element is the head of the list, untile f(head) is true
+    */
+  def takeWhileUnfold(f: A => Boolean): Stream[A] = {
+    val mapping = (state: Stream[A]) => state match {
+      case Cons(head, tail) => if (f(head())) Some(head(), tail()) else None
+      case Empty => None
+    }
+    Stream.unfold(this)(mapping)
+  }
+
+  /**
+    *
+    * Zipwith merge two stream according a merging function on two element (A,B) => C
+    *
+    * In this case the state will be composed by the two stream, and the actual element
+    * will be the function applied on both the head
+    */
+
+  def zipWithFunctionUnfold[B, C](b: Stream[B])(f: (A, B) => C): Stream[C] = {
+    val mapping = (state: (Stream[A], Stream[B])) => state match {
+      case (Cons(headA, tailA), Cons(headB, tailB)) => Some((f(headA(), headB()), (tailA(), tailB())))
+      //case (Empty, Cons(headB, tailB)) => Some((f(Empty, headB()), (Empty, tailB()))) //the function will handle empty stream in A
+      //case (Cons(headA, tailA), Empty) => Some((f(headA, Empty), (tailA(), Empty))) //the function will handle empty stream in B
+      case (_,_) => None
+    }
+    Stream.unfold((this, b))(mapping)
+  }
+
+  /**
+    *
+    * Zip two streams in one, where each element is composed by a tuple with the element in the same position of the Stream.
+    *
+    */
+  def zipWithUnfold[B, C](b: Stream[B]) : Stream[(A,B)] = {
+    val mapping = (state: (Stream[A], Stream[B])) => state match {
+      case (Cons(headA, tailA), Cons(headB, tailB)) => Some((headA(), headB()), (tailA(), tailB()))
+      case (_,_) => None
+    }
+    Stream.unfold((this, b))(mapping)
+  }
+
+  /**
+    *
+    * Creates a stream composed by tuples where the element are the one in the two stream in the same position. In case
+    * of a stream exhaust a none is used for the element.
+    *
+    */
+
+  def zipAll[B](s2: Stream[B]): Stream[(Option[A],Option[B])] = {
+    val mapping = (state: (Stream[A], Stream[B])) => state match {
+      case (Cons(headA, tailA), Cons(headB, tailB)) => Some((Some(headA()),Some(headB())), (tailA(), tailB()))
+      case (Empty, Cons(headB, tailB)) => Some((None,Some(headB())),(empty,tailB()))
+      case (Cons(headA, tailA), Empty) => Some((Some(headA()),None),(tailA(),empty))
+      case (_,_) => None
+    }
+    Stream.unfold((this, s2))(mapping)
+  }
 }
 
 case object Empty extends Stream[Nothing]
@@ -131,6 +221,9 @@ object Stream {
   def apply[A](as: A*): Stream[A] =
     if (as.isEmpty) empty
     else cons(as.head, apply(as.tail: _*))
+
+
+  val ones: Stream[Int] = Stream.cons(1, ones)
 
   /**
     * Exercise 5.8
@@ -176,6 +269,33 @@ object Stream {
   def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] = f(z) match { //matching using the function, so if the next state exist I'll do that, otherwise return an Empty stream
     case Some(_) => cons(f(z).map((t) => t._1).get, unfold(f(z).map((t) => t._2).get)(f))
     case _ => empty
+  }
+
+  /**
+    * Exercise 5.12
+    * Write fibs, from, constant, and ones in terms of unfold.
+    */
+
+
+  def onesUnfolded(): Stream[Int] = unfold(0)((s) => Some(1, 0))
+
+
+  def constantUnfolded[A](a: A): Stream[A] = unfold(a)((s) => Some(a, s))
+
+  /**
+    * The generic composition of a state help to manipulation any kind of situation, what I need fot fibonacci is that  state is composed from the previous 2 value that I have,
+    * I didn't get this before because all the function weren't realy requiring a state to operate
+    *
+    *
+    */
+  def fibsUnfolded(): Stream[Int] = {
+    unfold((-1, -1))( //the first unfold is called with the first value, now i hacve to define the function the calculates the value from the state
+      (state) => state match {
+        case (-1, -1) => Some(0, (0, 0)) //I needed this special case, otherwise the sequence will be (0,1,2 ...)
+        case (0, 0) => Some(1, (0, 1)) //in case of 0,0 I can't use the fibonacci algorithm so I have to provide the right state
+        case state => Some(state._1 + state._2, (state._2, state._1 + state._2))
+      }
+    )
   }
 
 }
