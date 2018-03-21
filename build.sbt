@@ -1,4 +1,3 @@
-
 name := "FunctionalProgrammingScala"
 
 version := "0.1"

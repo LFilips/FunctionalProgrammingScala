@@ -12,6 +12,14 @@ class StreamTest extends FlatSpec with Matchers {
 
   }
 
+  "the toList method" should "convert a big stream in a List" in {
+
+    val stream = Stream.constant(4)
+
+    stream.take(999).toList
+
+  }
+
   it should "give an Nil when invoked on an Empty stream" in {
 
     val stream = Empty
@@ -467,6 +475,15 @@ class StreamTest extends FlatSpec with Matchers {
 
   }
 
+  "ZipWithUnfold" should "return an empty stream if one of the stream is empty" in {
+
+    val streamA = Stream(1, 2)
+    val streamB = Empty
+
+    streamA.zipWithUnfold(streamB) should be(Empty)
+
+  }
+
   //    streamA.zipWithUnfold(streamB).toList should be(List((Some(1),Some("one")),(Some(2),Some("two")),(Some(3),Some("three")),(Some(4),Some("four"))))
 
 
@@ -504,6 +521,54 @@ class StreamTest extends FlatSpec with Matchers {
 
     streamA.zipAll(streamB) should be(Empty)
 
+  }
+
+  "startsWith" should "return true if the longer stream starts with the shorter" in {
+
+    val streamA = Stream(1, 2, 3, 4)
+    val streamB = Stream(1, 2)
+
+    streamA.startsWith(streamB) should be(true)
+
+  }
+
+  "startsWith" should "return false if the longer stream don't starts with the shorter" in {
+
+    val streamA = Stream(1, 2, 3, 4)
+    val streamB = Stream(1, 3)
+
+    streamA.startsWith(streamB) should be(false)
+
+  }
+
+  "startsWith" should "return false if one the stream is empty" in {
+
+    val streamA = Stream(1, 2, 3, 4)
+    val streamB = Empty
+
+    streamA.startsWith(streamB) should be(false)
+
+  }
+
+  "startsWith" should "return true if the infinite stream start with the other" in {
+
+    val streamA = Stream(1, 1, 1, 1)
+    val streamB = Stream.constant(1)
+
+    streamA.startsWith(streamB) should be(true)
+
+  }
+
+  "tails" should "generate all the tails of the stream" in {
+
+    val stream = Stream(1, 2, 3, 4)
+
+    val tailsList = stream.tails.toList
+
+    tailsList(0).toList should be(List(1,2,3,4))
+    tailsList(1).toList should be(List(2,3,4))
+    tailsList(2).toList should be(List(3,4))
+    tailsList(3).toList should be(List(4))
   }
 
 

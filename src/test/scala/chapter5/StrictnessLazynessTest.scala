@@ -5,7 +5,7 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class StrictnessLazynessTest extends FlatSpec with Matchers with MockFactory{
 
-  "the new if2" should "lazily produce the new value" in {
+  ignore should "lazily produce the new value" in {
 
     val mockedTrueFunction = mockFunction[String]
     val mockedFalseFunction = mockFunction[String]

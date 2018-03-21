@@ -6,13 +6,13 @@ object FirstChapterExercise {
     require(n >= 0)
     @annotation.tailrec
     def tailFib(actual: Int, index: Int, prev: Int, prev2: Int): Int = {
-      if (actual == index) return prev + prev2
+      if (actual == index) prev + prev2
       else tailFib(actual + 1, index, prev + prev2, prev)
     }
 
     n match {
-      case 0 => return 0
-      case 1 => return 1
+      case 0 =>  0
+      case 1 =>  1
       case _ => tailFib(2, n, 1, 0)
     }
   }
@@ -61,5 +61,5 @@ object FirstChapterExercise {
     (a) => f(g(a))
   }
 
-
 }
+

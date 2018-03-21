@@ -200,6 +200,48 @@ trait Stream[+A] {
     }
     Stream.unfold((this, s2))(mapping)
   }
+
+  /**
+    *
+    *
+    * Hard: Implement startsWith using functions you’ve written. It should check if one Stream is a prefix of another.
+    * For instance, Stream(1,2,3) startsWith Stream(1,2) would be true.
+    *
+    *
+    * For first the two stream are combined in one with the zip method. I only need tuple to the smallest one
+    * So Stream(1,2,3).zip( Stream(1,2)) => Stream((1,1),(2,2))
+    * Then using the folding functioin testing if the element of the tuple are the same (all the result are in a AND)
+    *
+    * 1) The function will short circuit on the first failure because of the and
+    * 2) this function don't care about the order of the operand, it check if one of the stream starts with the other
+    *
+    */
+  def startsWith[A](s: Stream[A]): Boolean = {
+    this.zipWithUnfold(s) match {
+      case Empty => false
+      case stream => stream.foldRight(true)((a,b) => (a._1 == a._2) && b )
+    }
+  }
+
+  /**
+    *
+    *Implement tails using unfold. For a given Stream, tails returns the Stream of suffixes of the input sequence,
+    * starting with the original Stream. For example, given Stream(1,2,3), it would return Stream(Stream(1,2,3),
+    * Stream(2,3), Stream(3), Stream()).
+    *
+    */
+
+
+  def tails: Stream[Stream[A]] = {
+    unfold(this)(_ match {
+      case Cons(head,tail) => Some(Cons(head,tail),tail())
+      case Empty => None
+    }) //I am missing the last empty stream, but this is really necessary? Can I simply append to it?
+  }
+
+
+
+  def scanRight[B](s: B)(f: (A,A) => B ) : Stream[B] = ???
 }
 
 case object Empty extends Stream[Nothing]
@@ -266,7 +308,8 @@ object Stream {
     *
     */
 
-  def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] = f(z) match { //matching using the function, so if the next state exist I'll do that, otherwise return an Empty stream
+  def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] = f(z) match {
+    //matching using the function, so if the next state exist I'll do that, otherwise return an Empty stream
     case Some(_) => cons(f(z).map((t) => t._1).get, unfold(f(z).map((t) => t._2).get)(f))
     case _ => empty
   }
@@ -290,7 +333,7 @@ object Stream {
     */
   def fibsUnfolded(): Stream[Int] = {
     unfold((-1, -1))( //the first unfold is called with the first value, now i hacve to define the function the calculates the value from the state
-      (state) => state match {
+      _ match {
         case (-1, -1) => Some(0, (0, 0)) //I needed this special case, otherwise the sequence will be (0,1,2 ...)
         case (0, 0) => Some(1, (0, 1)) //in case of 0,0 I can't use the fibonacci algorithm so I have to provide the right state
         case state => Some(state._1 + state._2, (state._2, state._1 + state._2))
