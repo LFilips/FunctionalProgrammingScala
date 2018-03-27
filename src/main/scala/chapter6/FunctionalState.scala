@@ -135,7 +135,10 @@ object SimpleRNG {
     *
     * @tparam A
     */
-  type Rand[+A] = RNG => (A, RNG)
+  type Rand[+A] = State[RNG, A]
+
+
+  type State[S, +A] = S => (A, S) /** More generic definition for state **/
 
 
   /**
@@ -290,9 +293,7 @@ object SimpleRNG {
   def flatMap[A, B](f: Rand[A])(g: A => Rand[B]): Rand[B] = {
     rng => {
       val (a, rng2) = f(rng)
-      g(a)
-      , rng2
-      )
+      g(a)(rng2)
     }
   }
 
@@ -303,7 +304,25 @@ object SimpleRNG {
     }
   }
 
+  /**
+    * Map with flatmap, this is the original map implementation
+    **/
+  def mapWithFlatMap[A, B](s: Rand[A])(f: A => B): Rand[B] = {
+    flatMap(s)((a) => (rng) => (f(a), rng))
+  }
+
+  def map2WithFlatMap[A, B, C](ra: Rand[A], rb: Rand[B])(f: (A, B) => C): Rand[C] = {
+    flatMap(ra)((a) => (rng) => (f(a, rb(rng)._1), rng))
+  }
+
 }
+
+case class State[S, +A](run: S => (A, S)) {
+
+}
+
+
+
 
 
 

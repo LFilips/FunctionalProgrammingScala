@@ -76,13 +76,25 @@ class SimpleRNGTest extends FlatSpec with Matchers {
     })
   }
 
-  "map" should "map the element produced from the other function according to the function providev" in {
+  "map" should "map the element produced from the other function according to the function provided" in {
 
     (0 to 10000).foreach((x) => {
 
       val rng = SimpleRNG(x)
       val rng2 = SimpleRNG(x)
       val next = SimpleRNG.map(SimpleRNG.int)(_ * 2)
+      next(rng)._1 should be(SimpleRNG.int(rng)._1 * 2)
+
+    })
+  }
+
+  "mapWithFlatMap" should "map the element produced from the other function according to the function provided" in {
+
+    (0 to 10000).foreach((x) => {
+
+      val rng = SimpleRNG(x)
+      val rng2 = SimpleRNG(x)
+      val next = SimpleRNG.mapWithFlatMap(SimpleRNG.int)(_ * 2)
       next(rng)._1 should be(SimpleRNG.int(rng)._1 * 2)
 
     })
@@ -96,6 +108,25 @@ class SimpleRNGTest extends FlatSpec with Matchers {
 
     //combining the result
     val map2 = SimpleRNG.map2(SimpleRNG.int, SimpleRNG.int)((_, _))
+
+    val next = map2(rng)
+    next._1._1 should be(SimpleRNG.int(rng)._1)
+    next._1._2 should be(SimpleRNG.int(SimpleRNG.int(rng)._2)._1)
+
+    /** Here I'm reproducing what is happening inside the map2, but i
+      * maybe is not the right solution to test in this way
+      */
+
+  }
+
+  "map2WithFlatmap" should "should be able to combine two result" in {
+
+    val seed = 15
+
+    val rng = SimpleRNG(seed)
+
+    //combining the result
+    val map2 = SimpleRNG.map2WithFlatMap(SimpleRNG.int, SimpleRNG.int)((_, _))
 
     val next = map2(rng)
     next._1._1 should be(SimpleRNG.int(rng)._1)
