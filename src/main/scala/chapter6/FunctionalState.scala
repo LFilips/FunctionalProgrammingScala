@@ -1,5 +1,7 @@
 package chapter6
 
+import chapter6.SimpleRNG.Rand
+
 trait RNG {
 
   /**
@@ -149,6 +151,8 @@ object SimpleRNG {
     */
   val int: Rand[Int] = _.nextInt
 
+  def intDef(rng: RNG): Rand[Int] = _.nextInt
+
   /**
     *
     * As said above here I'm using the type alias but I'm defining
@@ -294,6 +298,14 @@ object SimpleRNG {
     rng => {
       val (a, rng2) = f(rng)
       g(a)(rng2)
+
+      /**
+        * g(a) will produce a Rand[B], but since this is the block of the
+        * rng => we need to access to the (A,RNG) of it, so we use the state
+        * that we have as input and then we pass the new one produced from g
+        * in the output tuple
+        */
+
     }
   }
 
@@ -319,7 +331,90 @@ object SimpleRNG {
 
 case class State[S, +A](run: S => (A, S)) {
 
+
+  def map[B](f: A => B): State[S, B] = {
+    /**
+      * I'm invoking the map to a state, which is not evaluating the state itself, what we want is
+      * when the state will be evaluated the f funciton will be called on the A to become a B
+      */
+    State((state) => (f(this.run(state)._1), this.run(state)._2))
+  }
+
+
+  def map2[B, C](rb: State[S, B])(f: (A, B) => C): State[S, C] = {
+    State((state) => {
+      val (a, rng) = this.run(state)
+      val (b, rngB) = rb.run(rng)
+      (f(a, b), rngB)
+    })
+  }
+
+  def flatMap[B](g: A => State[S, B]): State[S, B] = {
+    State((state) => {
+      val (a, rng) = this.run(state)
+      g(a).run(rng) //passing the state along as we did in rand flatMap
+    })
+  }
+
 }
+
+sealed trait Input
+
+case object Coin extends Input
+
+case object Turn extends Input
+
+case class Machine(locked: Boolean, candies: Int, coins: Int)
+
+object State {
+  type Rand[A] = State[RNG, A]
+
+  def unit[S, A](a: A): State[S, A] =
+    State(s => (a, s))
+
+  /**
+    * Exercise 6.11
+    * Hard: To gain experience with the use of State, implement a finite state automaton that models a simple candy
+    * dispenser. The machine has two types of input: you can insert a coin, or you can turn the knob to dispense candy.
+    * It can be in one of two states: locked or unlocked. It also tracks how many candies are left and how many
+    * coins it contains.
+    */
+  def simulateMachine(inputs: List[Input]): State[Machine, (Int, Int)] = inputs match {
+    case head :: tail =>
+      State((state: Machine) => State.simulateMachine(tail).run(calculateNextState(head).run(state)._2))
+    case Nil =>
+      //When the input are finished I can return the chain of state
+      State((state) => ((state.candies, state.coins), Machine(state.locked, state.candies, state.coins)))
+  }
+
+
+  def calculateNextState(input: Input): State[Machine, (Int, Int)] = input match {
+    case Coin => State(
+      (state: Machine) => {
+        state match {
+          //Inserting a coin into a locked machine will cause it to unlock if there’s any candy left.
+          case Machine(true, candies, coins) if candies > 0 => ((candies, coins), Machine(false, candies, coins + 1))
+          //Any other case the machine remain will be locked state and coin increase
+          case Machine(locked, candies, coins) => ((candies, coins), Machine(locked, candies, coins + 1))
+        }
+      }
+    )
+    case Turn => {
+      State(
+        (state: Machine) => {
+          state match {
+            //turning the knob on a locked machine has no effect
+            case machine@Machine(true, candies, coins) => ((candies, coins), machine)
+            //turning the knob on an unlocked machine gives a candy and lock the machine
+            case Machine(false, candies, coins) => ((candies, coins), Machine(true, candies - 1, coins))
+          }
+        }
+      )
+    }
+  }
+}
+
+
 
 
 
