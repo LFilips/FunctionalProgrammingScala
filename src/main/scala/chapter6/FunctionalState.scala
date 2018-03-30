@@ -381,36 +381,35 @@ object State {
     */
   def simulateMachine(inputs: List[Input]): State[Machine, (Int, Int)] = inputs match {
     case head :: tail =>
-      State((state: Machine) => State.simulateMachine(tail).run(calculateNextState(head).run(state)._2))
+      State((state) => State.simulateMachine(tail).run(calculateNextState(head).run(state)._2))
     case Nil =>
       //When the input are finished I can return the chain of state
       State((state) => ((state.candies, state.coins), Machine(state.locked, state.candies, state.coins)))
   }
 
 
-  def calculateNextState(input: Input): State[Machine, (Int, Int)] = input match {
-    case Coin => State(
-      (state: Machine) => {
-        state match {
-          //Inserting a coin into a locked machine will cause it to unlock if there’s any candy left.
-          case Machine(true, candies, coins) if candies > 0 => ((candies, coins), Machine(false, candies, coins + 1))
-          //Any other case the machine remain will be locked state and coin increase
-          case Machine(locked, candies, coins) => ((candies, coins), Machine(locked, candies, coins + 1))
-        }
-      }
-    )
-    case Turn => {
-      State(
-        (state: Machine) => {
+  private def calculateNextState(input: Input): State[Machine, (Int, Int)] = {
+    State(input match {
+      case Coin =>
+        (state) => {
           state match {
-            //turning the knob on a locked machine has no effect
-            case machine@Machine(true, candies, coins) => ((candies, coins), machine)
-            //turning the knob on an unlocked machine gives a candy and lock the machine
-            case Machine(false, candies, coins) => ((candies, coins), Machine(true, candies - 1, coins))
+            //Inserting a coin into a locked machine will cause it to unlock if there’s any candy left.
+            case Machine(true, candies, coins) if candies > 0 => ((candies, coins), Machine(false, candies, coins + 1))
+            //Any other case the machine remain will be locked state and coin increase
+            case Machine(locked, candies, coins) => ((candies, coins), Machine(locked, candies, coins + 1))
           }
         }
-      )
+      case Turn =>
+        (state) => {
+          state match {
+            //turning the knob on an unlocked machine gives a candy and lock the machine
+            case Machine(false, candies, coins) => ((candies, coins), Machine(true, candies - 1, coins))
+            //turning the knob on a locked machine has no effect
+            case machine@Machine(true, candies, coins) => ((candies, coins), machine)
+          }
+        }
     }
+  )
   }
 }
 
