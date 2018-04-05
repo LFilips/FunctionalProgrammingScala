@@ -100,7 +100,7 @@ class EitherTest extends FlatSpec with Matchers {
 
     val eitherList : List[String] = List("1","Hello","3","4")
 
-    Either.traverse(eitherList)((a) => Either.Try(a.toInt) ) shouldBe a [Left[Exception]]
+    Either.traverse(eitherList)((a) => Either.Try(a.toInt) ) shouldBe a [Left[_]]
 
 
   }
