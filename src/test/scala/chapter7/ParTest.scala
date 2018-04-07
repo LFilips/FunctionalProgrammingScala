@@ -4,7 +4,7 @@ import java.util.concurrent._
 
 import org.scalatest.{FlatSpec, Matchers, fixture}
 import org.scalamock.scalatest.proxy.MockFactory
-import chapter7.Par.{Par, map2, run, unit, lazyUnit}
+import chapter7.Par.{Par, map2, run, unit, lazyUnit,map2Timeout}
 
 class ParTest extends FlatSpec with Matchers with MockFactory {
 
@@ -13,6 +13,11 @@ class ParTest extends FlatSpec with Matchers with MockFactory {
   //todo val threadFactory = new BasicThreadFactory some libraries can set the executor service pool name
   //val pool: ExecutorService = Executors.newFixedThreadPool(PoolSize) simple instance of executor
   val pool = new ThreadPoolExecutor(corePoolSize, maximumPoolSize,
+    0L, TimeUnit.MILLISECONDS,
+    new LinkedBlockingQueue[Runnable]());
+
+  //I need this for veryfing the timeout of the map2
+  val singleThreadPool = new ThreadPoolExecutor(1, 1,
     0L, TimeUnit.MILLISECONDS,
     new LinkedBlockingQueue[Runnable]());
 
@@ -40,6 +45,30 @@ class ParTest extends FlatSpec with Matchers with MockFactory {
 
   }
 
+  it should "synchronously (immediately) start the computation " in {
+
+    val stubbedFunction = stubFunction[Int, String]
+
+    unit(stubbedFunction(3))
+
+    stubbedFunction.verify(3)
+
+  }
+
+
+  it should "execute the computation synchrously blocking the thread, timeout shouldn't occur" in {
+
+    val function = () => {Thread.sleep(2000);"done"}
+
+    val par = unit(function())
+
+    val future = Par.run(pool)(par)
+
+    future.get(10,TimeUnit.NANOSECONDS) should be("done")
+
+
+  }
+
   "fork" should "create a new par which does the computation in a different thread" in {
 
     val par: Par[(Long, String)] = lazyUnit(threadTracer("Testing unit function"))
@@ -63,7 +92,7 @@ class ParTest extends FlatSpec with Matchers with MockFactory {
 
   }
 
-  "lazyUnit" should "start delay the computation until the run command" in {
+  it should "start delay the computation until the run command" in {
 
     //lazy unit is taking a lazy param, so the function is not evaluated until we call the run
 
@@ -81,7 +110,7 @@ class ParTest extends FlatSpec with Matchers with MockFactory {
 
   }
 
-  "lazyUnit" should "give back a future which used timeouts" in {
+  it should "give back a future which used timeouts" in {
 
     val function = () => {Thread.sleep(2000);"done"}
 
@@ -112,6 +141,43 @@ class ParTest extends FlatSpec with Matchers with MockFactory {
     val parC = map2(parA, parB)((a, b) => a + b)
 
     Par.run(pool)(parC).get should be(7)
+
+  }
+
+  "map2Timeout" should "respect the timeout considering both computation with lazyUnit/lazyUnit" in {
+
+    val sleepABit = (milliseconds: Long) => {Thread.sleep(milliseconds);"done"}
+
+    val parA = lazyUnit(sleepABit(500))
+    val parB = lazyUnit(sleepABit(1000))
+
+    val parC = map2Timeout(parA, parB)((a, b) => a + b)
+
+    /**
+      *I need to use the single thread pool otherwise the computation will be executed
+      * in parallel and the time consumed during A will used to do B and I will never
+      * be in the situation of a timeout
+      */
+
+    val future = Par.run(singleThreadPool)(parC)
+
+    an [TimeoutException] should be thrownBy future.get(1200,TimeUnit.MILLISECONDS)
+
+  }
+
+
+  "map2Timeout" should "not consider the time elapsed during the Unit since it is synchronous" in {
+
+    val sleepABit = (milliseconds: Long) => {Thread.sleep(milliseconds);"done"}
+
+    val parA = unit(sleepABit(1250)) // the sleep will occur here, so there will be no time consumed by it
+    val parB = lazyUnit(sleepABit(1000))
+
+    val parC = map2Timeout(parA, parB)((a, b) => a + b)
+
+    val future = Par.run(pool)(parC)
+
+    future.get(1500,TimeUnit.MILLISECONDS) should be("donedone")
 
   }
 

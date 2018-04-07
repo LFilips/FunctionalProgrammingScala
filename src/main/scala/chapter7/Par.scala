@@ -1,6 +1,8 @@
 package chapter7
 
-import java.util.concurrent.{Callable, ExecutorService, Future, TimeUnit}
+import java.util.concurrent._
+
+import chapter7.Par.Par
 
 /**
   * This is a simple implementation of the future that wraps a constant value
@@ -13,6 +15,52 @@ private case class UnitFuture[A](get: A) extends Future[A] {
   override def isDone: Boolean = true
 
   override def get(timeout: Long, unit: TimeUnit): A = get
+
+  def getWithElapsed(timeout: Long, unit: TimeUnit): (A, Long) = {
+    val start = System.currentTimeMillis()
+    (get(timeout, unit), System.currentTimeMillis() - start)
+    //param are always evaluated left to right so is safe to write in this way
+  }
+}
+
+/**
+  * Future implementation that is aware of the time already elapsed, I'll use it for chaining operation
+  * being aware of the time already elapsed evaluating other task.
+  * Since I need a concrete impl
+  *
+  * @tparam A
+  */
+private case class TimeAwareMap2Future[A, B, C](a: Future[A], b: Future[B])(f: (A, B) => C) extends Future[C] {
+
+  override def cancel(mayInterruptIfRunning: Boolean): Boolean = false
+
+  override def isCancelled: Boolean = false
+
+  override def isDone: Boolean = true
+
+  override def get(timeout: Long, unit: TimeUnit): C = {
+
+    val timeoutMillis = unit.toMillis(timeout)
+    //println(s"Milliseconds total timeout: $timeoutMillis")
+
+    val start = System.currentTimeMillis()
+    val parResA = a.get(timeoutMillis,TimeUnit.MILLISECONDS)
+    val elapsed = System.currentTimeMillis() - start
+
+    //println(s"Millis elapsed evaluating A: $elapsed")
+    val remainingTime = timeoutMillis - elapsed
+    //println(s"Milliss remained for evaluating B: $remainingTime")
+
+    //I'm forcing to millisecond, so there can be a loss of precision
+    val startB = System.currentTimeMillis()
+    val parResB = b.get(remainingTime,TimeUnit.MILLISECONDS)
+    val elapsedB = System.currentTimeMillis() - startB
+    //println(s"Millis elapsed evaluating B: $elapsedB")
+
+    f(parResA, parResB)
+  }
+
+  override def get(): C = f(a.get(), b.get())
 }
 
 
@@ -75,15 +123,37 @@ object Par {
   /**
     * Hard: Fix the implementation of map2 so that it respects the contract of timeouts on Future.
     *
+    * The fix the timeout problem i need to know before how much will be the upper bound of the timeout.
+    * But I cant do that, because this is something that will be provided during the get.
+    * So what I'll need to do is remember is some way the time aldreay elapsed calculating each element
+    * and then subtract this to the total time that I have availabe.
+    * But the time that i have to wait should be counted only from the moment when i start the get,
+    * why this is connected with the map per se? Should be something that is connected only with the get.
+    *
+    *
+    * Actually the map operation is a pure function and gives back a par, so only when it will be run
+    * there will be the notion of time elapsed.
+    *
+    *
+    * If for example I have the A operation that take 2 seconds, and the B operation that takes 2 seconds,
+    * I'll map this two opeation togheter. If this operation are lazy they will be executed outsite the
+    * map so nothing to worry about. If these operation are lazy they will be execute as soon we pass an executor
+    * service to the parC produced and create a Future.
+    *
+    *
+    * I have to be worried about the time elapsed only for the get operation, because will be the moment
+    * were I'll be waitign for some result.
+    *
+    *
+    *
+    *
+    *
     */
   def map2Timeout[A, B, C](a: => Par[A], b: => Par[B])(f: (A, B) => C): Par[C] = {
     (es: ExecutorService) => {
       val af = a(es)
       val bf = b(es)
-      val aMillisStart = System.currentTimeMillis()
-      val aGet = af.get()
-      val aMillisTotal = System.currentTimeMillis() - aMillisStart
-      UnitFuture(f(aGet, bf.get))
+      TimeAwareMap2Future(af, bf)(f)
     }
   }
 
