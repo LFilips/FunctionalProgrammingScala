@@ -1,8 +1,10 @@
 package chapter7
 
-import java.util.concurrent._
+import java.util.concurrent.{ExecutorService, _}
 
+import scala.language.implicitConversions
 import chapter7.Par.Par
+
 
 /**
   * This is a simple implementation of the future that wraps a constant value
@@ -44,7 +46,7 @@ private case class TimeAwareMap2Future[A, B, C](a: Future[A], b: Future[B])(f: (
     //println(s"Milliseconds total timeout: $timeoutMillis")
 
     val start = System.currentTimeMillis()
-    val parResA = a.get(timeoutMillis,TimeUnit.MILLISECONDS)
+    val parResA = a.get(timeoutMillis, TimeUnit.MILLISECONDS)
     val elapsed = System.currentTimeMillis() - start
 
     //println(s"Millis elapsed evaluating A: $elapsed")
@@ -53,7 +55,7 @@ private case class TimeAwareMap2Future[A, B, C](a: Future[A], b: Future[B])(f: (
 
     //I'm forcing to millisecond, so there can be a loss of precision
     val startB = System.currentTimeMillis()
-    val parResB = b.get(remainingTime,TimeUnit.MILLISECONDS)
+    val parResB = b.get(remainingTime, TimeUnit.MILLISECONDS)
     val elapsedB = System.currentTimeMillis() - startB
     //println(s"Millis elapsed evaluating B: $elapsedB")
 
@@ -63,8 +65,25 @@ private case class TimeAwareMap2Future[A, B, C](a: Future[A], b: Future[B])(f: (
   override def get(): C = f(a.get(), b.get())
 }
 
+class ParOps[A](p: Par[A]) {
+
+  /**
+    * Wrap the Par.map in this class for calling though infix operator
+    */
+  def map2[B, C](b: => Par[B])(f: (A, B) => C): Par[C] = Par.map2(p, b)(f)
+}
+
 
 object Par {
+
+  /**
+    * This implicit definition is used for implicitly convert to another type.
+    * Is nothign more than a casting method, but since it is defined with
+    * the implicit it will be invoked anytime there is need of using it
+    * and doesn't need to be explicitly called. However is a dangerous operation
+    */
+  implicit def toParOps[A](p: Par[A]): ParOps[A] = new ParOps(p)
+
   type Par[A] = (ExecutorService) => Future[A]
 
 
@@ -122,32 +141,6 @@ object Par {
 
   /**
     * Hard: Fix the implementation of map2 so that it respects the contract of timeouts on Future.
-    *
-    * The fix the timeout problem i need to know before how much will be the upper bound of the timeout.
-    * But I cant do that, because this is something that will be provided during the get.
-    * So what I'll need to do is remember is some way the time aldreay elapsed calculating each element
-    * and then subtract this to the total time that I have availabe.
-    * But the time that i have to wait should be counted only from the moment when i start the get,
-    * why this is connected with the map per se? Should be something that is connected only with the get.
-    *
-    *
-    * Actually the map operation is a pure function and gives back a par, so only when it will be run
-    * there will be the notion of time elapsed.
-    *
-    *
-    * If for example I have the A operation that take 2 seconds, and the B operation that takes 2 seconds,
-    * I'll map this two opeation togheter. If this operation are lazy they will be executed outsite the
-    * map so nothing to worry about. If these operation are lazy they will be execute as soon we pass an executor
-    * service to the parC produced and create a Future.
-    *
-    *
-    * I have to be worried about the time elapsed only for the get operation, because will be the moment
-    * were I'll be waitign for some result.
-    *
-    *
-    *
-    *
-    *
     */
   def map2Timeout[A, B, C](a: => Par[A], b: => Par[B])(f: (A, B) => C): Par[C] = {
     (es: ExecutorService) => {
@@ -156,6 +149,70 @@ object Par {
       TimeAwareMap2Future(af, bf)(f)
     }
   }
+
+  /**
+    * Exercise 7.4
+    * This API already enables a rich set of operations. Here’s a simple example: using lazyUnit,
+    * write a function to convert any function A => B to one that evaluates its result asynchronously.
+    */
+  def asyncF[A, B](f: A => B): A => Par[B] = {
+    (a) => lazyUnit(f(a))
+  }
+
+
+  def map[A, B](pa: Par[A])(f: A => B): Par[B] =
+    map2(pa, unit(()))((a, _) => f(a))
+
+  def sortPar(parList: Par[List[Int]]): Par[List[Int]] = map(parList)(_.sorted)
+
+  /**
+    * Exercise 7.5
+    * Hard: Write this function, called sequence. No additional primitives are required. Do not call run.
+    *
+    * The idea of the sequence is that converrt a list of par in a Par with a list A, where A in the computation
+    * that need to be done. In this way we can use this primitie for implementing parMap()
+    *
+    */
+  def sequence[A](ps: List[Par[A]]): Par[List[A]] = {
+    /**
+      * The return type of the whole function should be: (ExecutorService) => Future[A]
+      * in my case I have a list, so need to be (ExecutorService) => Future[List[A]
+      */
+    (es: ExecutorService) => {
+      //need to return a Future[List[A]], i have from the inout a List[Par[A]]
+      //map2(ps.head,ps.head)((a,b) => List(a,b))(es) this should be the two element combining function
+     //val mixing2Element : Future[List[A]] = map2(ps.head,ps.head)((a2,b2) => List(a2,b2))(es)
+
+      ps.foldRight(unit(List()) : Par[List[A]])((elemA,elemB) => map2(elemA,elemB)((a2,b2) => a2 :: b2))(es)
+
+    }
+
+  }
+
+
+  def sequenceShort[A](ps: List[Par[A]]): Par[List[A]] =
+      ps.foldRight(unit(List()) : Par[List[A]])((elemA,elemB) => map2(elemA,elemB)((a2,b2) => a2 :: b2))
+
+  /**
+    * The idea of parMap function is that you can do the map operation in parallel for a list.
+    * Is easy to imagine having a list of par, so we have a list[(executor) => (Future[A]), beacuase we can simply
+    * use the async function that we already have to
+    * @return
+    */
+  def parMap[A,B](ps: List[A])(f: A => B): Par[List[B]] = {
+    /**
+      * val fbs: List Par B = ps.map(asyncF(f)) This is the signature on the book
+      * but is a bit bad because is hard to understant how the async will produce the par
+      */
+    val fbs: List[Par[B]] = ps.map((a) => asyncF(f)(a))
+    sequence(fbs)
+  }
+
+
+  /**
+    * Write a function which filter the list in parallel. //TODO
+    */
+  def parFilter[A](as: List[A])(f: A => Boolean): Par[List[A]] = ???
 
 }
 
