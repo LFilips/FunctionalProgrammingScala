@@ -4,7 +4,7 @@ import java.util.concurrent._
 
 import org.scalatest.{FlatSpec, Matchers, fixture}
 import org.scalamock.scalatest.proxy.MockFactory
-import chapter7.Par.{Par, unit,lazyUnit,toParOps,map2,run,fork,asyncF,map2Timeout}
+import chapter7.Par.{Par, unit, lazyUnit, toParOps, map2, run, fork, asyncF, map2Timeout}
 
 
 class ParTest extends FlatSpec with Matchers with MockFactory {
@@ -60,7 +60,8 @@ class ParTest extends FlatSpec with Matchers with MockFactory {
   it should "execute the computation synchrously blocking the thread, timeout shouldn't occur" in {
 
     val function = () => {
-      Thread.sleep(2000); "done"
+      Thread.sleep(2000);
+      "done"
     }
 
     val par = unit(function())
@@ -116,7 +117,8 @@ class ParTest extends FlatSpec with Matchers with MockFactory {
   it should "give back a future which used timeouts" in {
 
     val function = () => {
-      Thread.sleep(2000); "done"
+      Thread.sleep(2000);
+      "done"
     }
 
     val par = lazyUnit(function())
@@ -149,10 +151,11 @@ class ParTest extends FlatSpec with Matchers with MockFactory {
 
   }
 
-  "map2" should "not respect the timeout considering both computation with lazyUnit/lazyUnit" in {
+  it should "not respect the timeout considering both computation with lazyUnit/lazyUnit" in {
 
     val sleepABit = (milliseconds: Long) => {
-      Thread.sleep(milliseconds); "done"
+      Thread.sleep(milliseconds);
+      "done"
     }
 
     val parA = lazyUnit(sleepABit(500))
@@ -169,7 +172,8 @@ class ParTest extends FlatSpec with Matchers with MockFactory {
   "map2Timeout" should "respect the timeout considering both computation with lazyUnit/lazyUnit" in {
 
     val sleepABit = (milliseconds: Long) => {
-      Thread.sleep(milliseconds); "done"
+      Thread.sleep(milliseconds);
+      "done"
     }
 
     val parA = lazyUnit(sleepABit(500))
@@ -190,10 +194,11 @@ class ParTest extends FlatSpec with Matchers with MockFactory {
   }
 
 
-  "map2Timeout" should "not consider the time elapsed during the Unit since it is synchronous" in {
+  it should "not consider the time elapsed during the Unit since it is synchronous" in {
 
     val sleepABit = (milliseconds: Long) => {
-      Thread.sleep(milliseconds); "done"
+      Thread.sleep(milliseconds);
+      "done"
     }
 
     val parA = unit(sleepABit(1250)) // the sleep will occur here, so there will be no time consumed by it
@@ -243,14 +248,33 @@ class ParTest extends FlatSpec with Matchers with MockFactory {
 
   }
 
-
-  "parMap" should "apply the map operation parallely" in {
+  "parMap" should "apply the map operation in parallel" in {
 
     val list = List.tabulate(10)((x) => x)
 
-    val parMap = Par.parMap(list)((x) => (x*2).toString)
+    val parMapped = Par.parMap(list)((x) => (x * 2).toString)
 
-    Par.run(pool)(parMap).get() should be(List.tabulate(10)((x) => (x*2).toString))
+    Par.run(pool)(parMapped).get() should be(List.tabulate(10)((x) => (x * 2).toString))
+
+  }
+
+  "parMap" should "apply the map operation in parallel 2" in {
+
+    val list = List.tabulate(10)((x) => x)
+
+    val parMapped = Par.parMap(list)((x) => (x * 2).toString)
+
+    Par.runDebug(pool)(parMapped).get() should be(List.tabulate(10)((x) => (x * 2).toString))
+
+  }
+
+  "parFilter" should "apply the filter operation in parallel" in {
+
+    val list = List.tabulate(20)((x) => x)
+
+    val parFiltered = Par.parFilter(list)((x) => (x % 2) == 0) //Filtering even number
+
+    Par.run(pool)(parFiltered).get() should be(List.tabulate(10)((x) => x * 2))
 
   }
 

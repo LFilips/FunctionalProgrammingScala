@@ -3,7 +3,9 @@ package chapter7
 import java.util.concurrent.{ExecutorService, _}
 
 import scala.language.implicitConversions
-import chapter7.Par.Par
+import chapter7.Par.{Par}
+import com.typesafe.scalalogging.Logger
+import org.slf4j.LoggerFactory
 
 
 /**
@@ -34,6 +36,8 @@ private case class UnitFuture[A](get: A) extends Future[A] {
   */
 private case class TimeAwareMap2Future[A, B, C](a: Future[A], b: Future[B])(f: (A, B) => C) extends Future[C] {
 
+  val logger = Logger(LoggerFactory.getLogger(classOf[TimeAwareMap2Future[A,B,C]]))
+
   override def cancel(mayInterruptIfRunning: Boolean): Boolean = false
 
   override def isCancelled: Boolean = false
@@ -43,21 +47,22 @@ private case class TimeAwareMap2Future[A, B, C](a: Future[A], b: Future[B])(f: (
   override def get(timeout: Long, unit: TimeUnit): C = {
 
     val timeoutMillis = unit.toMillis(timeout)
-    //println(s"Milliseconds total timeout: $timeoutMillis")
+
+    logger.debug(s"Milliseconds total timeout: $timeoutMillis")
 
     val start = System.currentTimeMillis()
     val parResA = a.get(timeoutMillis, TimeUnit.MILLISECONDS)
     val elapsed = System.currentTimeMillis() - start
 
-    //println(s"Millis elapsed evaluating A: $elapsed")
+    logger.debug(s"Millis elapsed evaluating A: $elapsed")
     val remainingTime = timeoutMillis - elapsed
-    //println(s"Milliss remained for evaluating B: $remainingTime")
+    logger.debug(s"Milliss remained for evaluating B: $remainingTime")
 
     //I'm forcing to millisecond, so there can be a loss of precision
     val startB = System.currentTimeMillis()
     val parResB = b.get(remainingTime, TimeUnit.MILLISECONDS)
     val elapsedB = System.currentTimeMillis() - startB
-    //println(s"Millis elapsed evaluating B: $elapsedB")
+    logger.debug(s"Millis elapsed evaluating B: $elapsedB")
 
     f(parResA, parResB)
   }
@@ -75,6 +80,9 @@ class ParOps[A](p: Par[A]) {
 
 
 object Par {
+
+
+  val logger = Logger(LoggerFactory.getLogger("Par"))
 
   /**
     * This implicit definition is used for implicitly convert to another type.
@@ -104,6 +112,7 @@ object Par {
     */
   def fork[A](a: => Par[A]): Par[A] = { (es: ExecutorService) =>
     es.submit(new Callable[A] {
+      logger.debug(s"Submitting job to $es")
       def call = a(es).get
     })
   }
@@ -127,6 +136,11 @@ object Par {
     * @return the result
     */
   def run[A](es: ExecutorService)(a: Par[A]): Future[A] = a(es)
+
+
+  def runDebug[A](es: ExecutorService)(a: Par[A]): Future[A] = {
+    a(es)
+  }
 
   /**
     * Combines the results of two parallel computations with a binary function
@@ -169,9 +183,6 @@ object Par {
     * Exercise 7.5
     * Hard: Write this function, called sequence. No additional primitives are required. Do not call run.
     *
-    * The idea of the sequence is that converrt a list of par in a Par with a list A, where A in the computation
-    * that need to be done. In this way we can use this primitie for implementing parMap()
-    *
     */
   def sequence[A](ps: List[Par[A]]): Par[List[A]] = {
     /**
@@ -180,10 +191,10 @@ object Par {
       */
     (es: ExecutorService) => {
       //need to return a Future[List[A]], i have from the inout a List[Par[A]]
-      //map2(ps.head,ps.head)((a,b) => List(a,b))(es) this should be the two element combining function
-     //val mixing2Element : Future[List[A]] = map2(ps.head,ps.head)((a2,b2) => List(a2,b2))(es)
 
-      ps.foldRight(unit(List()) : Par[List[A]])((elemA,elemB) => map2(elemA,elemB)((a2,b2) => a2 :: b2))(es)
+      //val mixing2Element : Future[List[A]] = map2(ps.head,ps.head)((a2,b2) => List(a2,b2))(es)
+
+      ps.foldRight(unit(List()): Par[List[A]])((elemA, elemB) => map2(elemA, elemB)((a2, b2) => a2 :: b2))(es)
 
     }
 
@@ -191,18 +202,21 @@ object Par {
 
 
   def sequenceShort[A](ps: List[Par[A]]): Par[List[A]] =
-      ps.foldRight(unit(List()) : Par[List[A]])((elemA,elemB) => map2(elemA,elemB)((a2,b2) => a2 :: b2))
+    ps.foldRight(unit(List()): Par[List[A]])((elemA, elemB) => map2(elemA, elemB)((a2, b2) => a2 :: b2))
 
   /**
     * The idea of parMap function is that you can do the map operation in parallel for a list.
     * Is easy to imagine having a list of par, so we have a list[(executor) => (Future[A]), beacuase we can simply
     * use the async function that we already have to
+    *
     * @return
     */
-  def parMap[A,B](ps: List[A])(f: A => B): Par[List[B]] = {
+  def parMap[A, B](ps: List[A])(f: A => B): Par[List[B]] = {
     /**
-      * val fbs: List Par B = ps.map(asyncF(f)) This is the signature on the book
-      * but is a bit bad because is hard to understant how the async will produce the par
+      * We are converting each element of the list from A to Par[B]. This means that the list now is composed
+      * from computational unit that can be executed in Parallel.
+      * Then the sequence is applied to the parMap. At this point I have a list of computational unit
+      *
       */
     val fbs: List[Par[B]] = ps.map((a) => asyncF(f)(a))
     sequence(fbs)
@@ -212,7 +226,16 @@ object Par {
   /**
     * Write a function which filter the list in parallel. //TODO
     */
-  def parFilter[A](as: List[A])(f: A => Boolean): Par[List[A]] = ???
+  def parFilter[A](as: List[A])(f: A => Boolean): Par[List[A]] = {
+
+    val liftedFunction: (A) => List[A] = (a: A) => f(a) match {
+      case true => List(a)
+      case _ => List()
+    }
+
+    val fbs: List[Par[List[A]]] = as.map((a) => asyncF(liftedFunction)(a))
+    fbs.foldRight(unit(List()): Par[List[A]])((elemA, elemB) => map2(elemA, elemB)((a2, b2) => a2 ::: b2))
+  }
 
 }
 
