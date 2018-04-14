@@ -118,6 +118,14 @@ class OptionTest extends FlatSpec with Matchers {
 
   }
 
+  "The variance2 method" should "correctly calculate the variance" in {
+
+    val list = List(1.0, 2.0, 3.0)
+
+    Chapter4.variance2(list) should be(Some(0.6666666666666666))
+
+  }
+
   "The Try method" should "return a none when an exception is thrown" in {
 
     lazy val functionWithException = {

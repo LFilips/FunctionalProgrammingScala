@@ -3,9 +3,11 @@ package chapter7
 import java.util.concurrent.{ExecutorService, _}
 
 import scala.language.implicitConversions
-import chapter7.Par.{Par}
+import chapter7.Par.{Par, run}
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
+
+import scala.None
 
 
 /**
@@ -36,7 +38,7 @@ private case class UnitFuture[A](get: A) extends Future[A] {
   */
 private case class TimeAwareMap2Future[A, B, C](a: Future[A], b: Future[B])(f: (A, B) => C) extends Future[C] {
 
-  val logger = Logger(LoggerFactory.getLogger(classOf[TimeAwareMap2Future[A,B,C]]))
+  val logger = Logger(LoggerFactory.getLogger(classOf[TimeAwareMap2Future[A, B, C]]))
 
   override def cancel(mayInterruptIfRunning: Boolean): Boolean = false
 
@@ -76,6 +78,15 @@ class ParOps[A](p: Par[A]) {
     * Wrap the Par.map in this class for calling though infix operator
     */
   def map2[B, C](b: => Par[B])(f: (A, B) => C): Par[C] = Par.map2(p, b)(f)
+
+  def flatMap[B](f: A => Par[B]): Par[B] = {
+    Par.flatMap(p)(f)
+  }
+
+  def flatMapUsingJoin[B](f: A => Par[B]): Par[B] = {
+    Par.flatMapUsingJoin(p)(f)
+  }
+
 }
 
 
@@ -113,6 +124,7 @@ object Par {
   def fork[A](a: => Par[A]): Par[A] = { (es: ExecutorService) =>
     es.submit(new Callable[A] {
       logger.debug(s"Submitting job to $es")
+
       def call = a(es).get
     })
   }
@@ -237,8 +249,88 @@ object Par {
     fbs.foldRight(unit(List()): Par[List[A]])((elemA, elemB) => map2(elemA, elemB)((a2, b2) => a2 ::: b2))
   }
 
-}
+  /**
+    * Exercise 7.7
+    * Hard: Given map(y)(id) == y, it’s a free theorem that map(map(y)(g))(f) == map(y)(f compose g). (This is sometimes
+    * called map fusion, and it can be used as an optimization—rather than spawning a separate parallel computation to
+    * compute the second mapping, we can fold it into the first mapping.)[13] Can you prove it? You may want to read
+    * the paper “Theorems for Free!” (http://mng.bz/Z9f1) to better understand the “trick” of free theorems.
+    * //TODO
+    */
 
+
+  def equal[A](e: ExecutorService)(p: Par[A], p2: Par[A]): Boolean =
+    p(e).get == p2(e).get
+
+
+  def choice[A](cond: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] = {
+    es => {
+      run(es)(cond).get() match {
+        case true => t(es)
+        case false => f(es)
+      }
+    }
+  }
+
+  def choice2[A](cond: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] = {
+    val list = List(t, f)
+    val convertedToIntFunction = map2(cond, unit())((a, _) => if (a) 0 else 1)
+    choiceN(convertedToIntFunction)(list)
+  }
+
+  def choiceN[A](n: Par[Int])(choices: List[Par[A]]): Par[A] = {
+    //fixme I should add check for out of nound exc, but is out of scope
+    es => {
+      choices(run(es)(n).get())(es)
+    }
+  }
+
+  def choiceMap[K, V](key: Par[K])(choices: Map[K, Par[V]]): Par[V] = {
+    es => {
+      val k = run(es)(key).get
+      run(es)(choices(k))
+    }
+  }
+
+  def chooser[A, B](pa: Par[A])(choices: A => Par[B]): Par[B] = {
+    (es) => {
+      val a = pa(es).get()
+      choices(a)(es)
+    }
+  }
+
+  def choice3[A](cond: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] = {
+    chooser(cond)((condition) => {
+      if (condition) t else f
+    })
+  }
+
+  def choiceN2[A](n: Par[Int])(choices: List[Par[A]]): Par[A] = {
+    chooser(n)((num) => choices(num))
+  }
+
+  def join[A](a: Par[Par[A]]): Par[A] = {
+    (es) => {
+      run(es)(a).get()(es)
+    }
+  }
+
+  def flatMap[A, B](a: Par[A])(f: A => Par[B]): Par[B] = {
+    (es) => {
+      val par = run(es)(a).get
+      f(par)(es)
+    }
+  }
+
+  def flatMapUsingJoin[A, B](a: Par[A])(f: A => Par[B]): Par[B] = {
+    join(map(a)(f))
+  }
+
+  def joinUsingFlatMap[A](a: Par[Par[A]]): Par[A] = {
+    flatMap(a)((par) => par)
+  }
+
+}
 
 /**
   * The main idea is to create an api that will allow to do parallel computation. Let's take as example the sum

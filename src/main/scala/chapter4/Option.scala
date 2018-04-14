@@ -92,9 +92,9 @@ object Option {
     * Sometimes we’ll want to map over a list using a function that might fail, returning None if applying it to any element
     * of the list returns None. For example, what if we have a whole list of String values that we wish to parse to Option[Int]?
     */
-  def parseInts(list: List[String]) : Option[List[Int]] = list match {
+  def parseInts(list: List[String]): Option[List[Int]] = list match {
     case Nil => Some(Nil)
-    case h :: t => Chapter4.Try(h.toInt).flatMap((head) => parseInts(t).map( (tailHead) => head :: tailHead))
+    case h :: t => Chapter4.Try(h.toInt).flatMap((head) => parseInts(t).map((tailHead) => head :: tailHead))
   }
 
   /**
@@ -109,17 +109,17 @@ object Option {
     * "1" :: List("2","3")  => Try("1".toInt).flatMap(( "1" => parseInt(List("2","3").map( (tailHead) => 1 :: tailHead))
     * "2" :: List("3")      => Try("2".toInt).flatMap(( "2" => parseInt(List("3").map( (tailHead) => 3 :: tailHead))
     * "3" :: List()         => Try("3".toInt).flatMap(( "3" => parseInt(List()).map( (tailHead) => 3 :: tailHead))
-    *  Nil                  => None //now we go back
-    *  "3" :: List()         => Try("3".toInt).flatMap(( "3" => Some(Nil).map( (Nil) => 3 :: Nil))  ---> Option[List[Int]]
+    * Nil                  => None //now we go back
+    * "3" :: List()         => Try("3".toInt).flatMap(( "3" => Some(Nil).map( (Nil) => 3 :: Nil))  ---> Option[List[Int]]
     *
-    *  This is the key moment, when the Option is converted to the list using the map appending the element to a Nil Some(Nil).map( (x) => 3 ::: Nil)
-    *  "2" :: List("3")      => Try("2".toInt).flatMap(( "2" => Option(List(3)).map( (List(3) => 2 :: List(3))
-    *  "1" :: List("2","3")  => Try("1".toInt).flatMap(( "1" => List(2,3).map( (tailHead) => 1 :: List(2,3)))
-    *  "1" :: List("2","3")  => Try("1".toInt).flatMap(( "1" => List(2,3).map( (tailHead) => 1 :: List(2,3)))  --> Option(List(1,2,3))
+    * This is the key moment, when the Option is converted to the list using the map appending the element to a Nil Some(Nil).map( (x) => 3 ::: Nil)
+    * "2" :: List("3")      => Try("2".toInt).flatMap(( "2" => Option(List(3)).map( (List(3) => 2 :: List(3))
+    * "1" :: List("2","3")  => Try("1".toInt).flatMap(( "1" => List(2,3).map( (tailHead) => 1 :: List(2,3)))
+    * "1" :: List("2","3")  => Try("1".toInt).flatMap(( "1" => List(2,3).map( (tailHead) => 1 :: List(2,3)))  --> Option(List(1,2,3))
     *
     */
 
-  def parseIntsUsingSequence(list: List[String]) : Option[List[Int]] = sequenceUsingFlatMap(list.map((x) => Chapter4.Try(x.toInt)))
+  def parseIntsUsingSequence(list: List[String]): Option[List[Int]] = sequenceUsingFlatMap(list.map((x) => Chapter4.Try(x.toInt)))
 
   /**
     *
@@ -147,7 +147,16 @@ object Chapter4 {
     */
 
   def variance(xs: Seq[Double]): Option[Double] = {
-    mean(xs).flatMap((mean) => Some((xs.fold(0.0)((x, y) => Math.pow(y - mean, 2.0) + x)))).map((value) => value / xs.size)
+    mean(xs).
+      flatMap((mean) => Some((xs.fold(0.0)((x, y) => Math.pow(y - mean, 2.0) + x))))
+      .map((value) => value / xs.size)
+  }
+
+  def variance2(xs: Seq[Double]): Option[Double] = {
+    for {
+      mean <- mean(xs)
+      value <- Some((xs.fold(0.0)((x, y) => Math.pow(y - mean, 2.0) + x)))
+    } yield value / xs.size
   }
 
   def lift[A, B](f: A => B): Option[A] => Option[B] = (x) => x.map(f)

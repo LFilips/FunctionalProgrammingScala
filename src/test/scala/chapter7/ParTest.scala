@@ -4,7 +4,7 @@ import java.util.concurrent._
 
 import org.scalatest.{FlatSpec, Matchers, fixture}
 import org.scalamock.scalatest.proxy.MockFactory
-import chapter7.Par.{Par, unit, lazyUnit, toParOps, map2, run, fork, asyncF, map2Timeout}
+import chapter7.Par.{Par, asyncF, fork, lazyUnit, map2, map2Timeout, run, toParOps, unit}
 
 
 class ParTest extends FlatSpec with Matchers with MockFactory {
@@ -275,6 +275,157 @@ class ParTest extends FlatSpec with Matchers with MockFactory {
     val parFiltered = Par.parFilter(list)((x) => (x % 2) == 0) //Filtering even number
 
     Par.run(pool)(parFiltered).get() should be(List.tabulate(10)((x) => x * 2))
+
+  }
+
+  /**
+    * This test shows that we have a deadlock when we use a singlethread pool
+    * becuase of the implementation of fork
+    */
+  ignore should "cause a deadlock with a singlethread pool" in {
+
+    val a = lazyUnit(42 + 1)
+    val S = Executors.newFixedThreadPool(1)
+    Par.equal(S)(a, fork(a))
+
+    /** What is happening here?
+      * This is the equals expanded:
+      * p(e).get == p2(e).get
+      *
+      * The executor is passed to a(e).get and it blocks and gets the result.
+      * The second part is to do p2(e).get where p2 is a fork.
+      * So we have a fork(a)(e).get, but the inner implementation of the fork is using a thread for submitting
+      * the job and another for waiting and with a thread pool of 1 we this will cause a deadlock
+      *
+      */
+
+  }
+
+  /**
+    * becuase of the implementation of fork
+    */
+  ignore should "cause a deadlock with a sinngle thead pool without using the equal" in {
+
+    val a = lazyUnit(42 + 1)
+    val S = Executors.newFixedThreadPool(1)
+    fork(a)(S).get
+
+  }
+
+  ignore should "cause a deadlock with any thead pools if met certaing condition" in {
+
+    /**
+      * a is executing the get on B in is own get, since all the thread are blocked the new job
+      * in fork cant be submitted
+      */
+
+    val b = lazyUnit(42 + 1)
+    val S = Executors.newFixedThreadPool(2)
+    val a = lazyUnit(Par.run(S)(b).get)
+    fork(a)(S).get
+
+  }
+
+
+  /**
+    * This unit tests shows how you can create a cyclic dependency between job and consume the thread pool causing deadlock
+    */
+  ignore should "cause a deadlock with a any fixed size pool" in {
+
+    val PoolSize = 5
+
+    val fixedSizePool = Executors.newFixedThreadPool(PoolSize)
+
+    val firstJob = lazyUnit(42 + 1)
+
+
+    def createCyclicDep(p: Par[Int], size: Int): Par[Int] = size match {
+      case 0 => p
+      case n => createCyclicDep(lazyUnit(Par.run(fixedSizePool)(firstJob).get), size)
+    }
+
+    val cyclicJob = createCyclicDep(firstJob, PoolSize)
+
+    fork(cyclicJob)(fixedSizePool).get
+
+  }
+
+
+  "choice" should "choose the function to executed according the result of the first" in {
+
+    val truePar = lazyUnit(true)
+    val falsePar = lazyUnit(false)
+    val t = lazyUnit("true")
+    val f = lazyUnit("false")
+    val trueChosenPar = Par.choice(truePar)(t, f)
+    val falseChosenPar = Par.choice(falsePar)(t, f)
+
+    trueChosenPar(pool).get() should be("true")
+    falseChosenPar(pool).get() should be("false")
+
+  }
+
+  "choice2" should "choose the function to executed according the result of the first" in {
+
+    val truePar = lazyUnit(true)
+    val falsePar = lazyUnit(false)
+    val t = lazyUnit("true")
+    val f = lazyUnit("false")
+    val trueChosenPar = Par.choice2(truePar)(t, f)
+    val falseChosenPar = Par.choice2(falsePar)(t, f)
+
+    trueChosenPar(pool).get() should be("true")
+    falseChosenPar(pool).get() should be("false")
+
+  }
+
+
+
+  "choice3" should "choose the function to executed according the result of the first" in {
+
+    val truePar = lazyUnit(true)
+    val falsePar = lazyUnit(false)
+    val t = lazyUnit("true")
+    val f = lazyUnit("false")
+    val trueChosenPar = Par.choice3(truePar)(t, f)
+    val falseChosenPar = Par.choice3(falsePar)(t, f)
+
+    trueChosenPar(pool).get() should be("true")
+    falseChosenPar(pool).get() should be("false")
+
+  }
+
+  "choiceN" should "choose the function to executed according the result of the first" in {
+
+    val conditionPar = lazyUnit(1)
+    val list = List(lazyUnit("one"),lazyUnit("two"))
+    val chosenPar = Par.choiceN(conditionPar)(list)
+
+    chosenPar(pool).get() should be("two")
+
+  }
+
+  "flatMap" should "apply the function f to A and the flatten the result in a Par[B]" in {
+
+    //using implicit conversion for getting the flatmap
+    val par = lazyUnit(1)
+    par.flatMap((a) => lazyUnit(a*2))(pool).get should be(2)
+
+  }
+
+  "flatMapUsingJoin" should "apply the function f to A and the flatten the result in a Par[B]" in {
+
+    //using implicit conversion for getting the flatmap
+    val par = lazyUnit(1)
+    par.flatMapUsingJoin((a) => lazyUnit(a*2))(pool).get should be(2)
+
+  }
+
+  "join" should "extract the Par inside the Par" in {
+
+    //using implicit conversion for getting the flatmap
+    val par = lazyUnit(lazyUnit(1))
+    Par.join(par)(pool).get() should be(1)
 
   }
 
