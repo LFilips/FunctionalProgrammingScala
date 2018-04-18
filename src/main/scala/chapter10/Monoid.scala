@@ -75,9 +75,37 @@ object Monoid {
     * The Greek prefix endo- means within, in the sense that an endofunction’s codomain is within its domain.
     **/
 
-  def endoMonoid[A] : Monoid[A => A] = new Monoid[A => A] {
+  def endoMonoid[A]: Monoid[A => A] = new Monoid[A => A] {
     override def op(a1: A => A, a2: A => A): A => A = a1.compose(a2)
 
     override def zero: A => A = (a) => a
   }
+
+  /**
+    * The method concated a list of A using the monoid instance for A
+    *
+    * @return the concatenated list
+    */
+  def concatenate[A](as: List[A], m: Monoid[A]): A =
+    as.foldLeft(m.zero)(m.op)
+
+  def foldMap[A, B](as: List[A], m: Monoid[B])(f: A => B): B = {
+    concatenate(as.map(f), m)
+  }
+
+  /** Exercise 10.6
+    * Hard: The foldMap function can be implemented using either foldLeft or fold-Right.
+    * But you can also write foldLeft and foldRight using foldMap! Try it.
+    * Signature of the orginal foldRght of list
+    * override def foldRight[B](z: B)(op: (A, B) => B): B =
+    *     reverse.foldLeft(z)((right, left) => op(left, right))
+    */
+  def foldRight[A, B](list: List[A], z: B)(op: (A, B) => B): B = {
+    val monoid = new Monoid[B] {
+      override def op(a1: B, a2: B): B = op(a1,a2)
+      override def zero: B = z
+    }
+    foldMap(list, monoid)(a => op(monoid.zero,a))
+  }
+
 }

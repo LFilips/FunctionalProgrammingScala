@@ -20,7 +20,7 @@ class MonoidTest extends FlatSpec with Matchers {
   }
 
   trait intFixture extends MonoidFixture[Int] {
-    val tuple = (1,2,3)
+    val tuple = (1, 2, 3)
     val first = tuple._1
     val second = tuple._1
     val third = tuple._1
@@ -35,9 +35,10 @@ class MonoidTest extends FlatSpec with Matchers {
 
   /**
     * Generic function that tests the rules of a Monoid.
+    *
     * @tparam A the monoid type
     */
-  def testMonoidRules[A](tuple: (Monoid[A],MonoidFixture[A],(A, A) => A)) :Unit = {
+  def testMonoidRules[A](tuple: (Monoid[A], MonoidFixture[A], (A, A) => A)): Unit = {
     val monoidUnderTest = tuple._1
     val monoidFixture = tuple._2
     val operator = tuple._3
@@ -78,12 +79,11 @@ class MonoidTest extends FlatSpec with Matchers {
 
   "intAdditionshould" should MonoidRules in {
 
-    val tuple = (Monoid.intAddition, new intFixture {}, (a:Int, b: Int) => a + b)
+    val tuple = (Monoid.intAddition, new intFixture {}, (a: Int, b: Int) => a + b)
 
     testMonoidRules[Int](tuple)
 
   }
-
 
   /*"endoMonoid" should MonoidRules in {
 
@@ -95,6 +95,55 @@ class MonoidTest extends FlatSpec with Matchers {
 
 
   }*/
+
+  "Monoid" should "use op and zero in a fold" in {
+
+    val listMonoidString = listMonoid[String]
+
+    val list = List("hi", "my", "name", "is")
+
+    list.foldLeft(stringMonoid.zero)(stringMonoid.op) should be("himynameis")
+
+  }
+
+  "Monoid" should "have the same value if used on fold left or fold right" in {
+
+    val listMonoidString = listMonoid[String]
+
+    val list = List("hi", "my", "name", "is")
+
+    val left = list.foldLeft(stringMonoid.zero)(stringMonoid.op)
+    val right = list.foldRight(stringMonoid.zero)(stringMonoid.op)
+
+    left should be(right)
+
+  }
+
+  "Concatenate" should "concatenate a List[A] using the monoid[A]" in {
+
+    val concatenated = Monoid.concatenate(List("hi", "my", "name", "is", "luca"), stringMonoid)
+
+    concatenated should be("himynameisluca")
+
+  }
+
+  "FoldMap" should "fold a list[A] using the Monoid[B] given a function f:A => B" in {
+
+    val folded = Monoid.foldMap(List("1", "2", "3", "4", "5"),Monoid.intAddition)(a => a.toInt)
+
+    folded should be(15)
+
+  }
+
+  "FoldRight via FoldMap" should "fold a list[A]" in {
+
+    val listMonoidString = listMonoid[String]
+
+    val list = List("hi", "my", "name", "is")
+
+    Monoid.foldRight(list,stringMonoid.zero)(stringMonoid.op) should be("himynameis")
+
+  }
 
 
 }
