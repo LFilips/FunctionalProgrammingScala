@@ -15,22 +15,29 @@ class MonoidTest extends FlatSpec with Matchers {
   trait StringFixture extends MonoidFixture[String] {
     val tuple = ("a", "b", "c")
     val first = tuple._1
-    val second = tuple._1
-    val third = tuple._1
+    val second = tuple._2
+    val third = tuple._3
   }
 
   trait intFixture extends MonoidFixture[Int] {
     val tuple = (1,2,3)
     val first = tuple._1
-    val second = tuple._1
-    val third = tuple._1
+    val second = tuple._2
+    val third = tuple._3
   }
 
   trait ListFixture extends MonoidFixture[List[Int]] {
     val tuple = (List(1), List(2), List(3))
     val first = tuple._1
-    val second = tuple._1
-    val third = tuple._1
+    val second = tuple._2
+    val third = tuple._3
+  }
+
+  trait endoFixture extends MonoidFixture[Int => Int] {
+    val tuple = ((a:Int) => a, (a:Int) => a*2, (a:Int) => a+1)
+    val first = tuple._1
+    val second = tuple._2
+    val third = tuple._3
   }
 
   /**
@@ -85,16 +92,16 @@ class MonoidTest extends FlatSpec with Matchers {
   }
 
 
-  /*"endoMonoid" should MonoidRules in {
+  "endoMonoid" should MonoidRules in {
 
-    val endoMonoid = endoMonoid[Int] _
+    val endoMonoidIntToInt = Monoid.endoMonoid[Int]
 
-    val tuple = (endoMonoid, new ListFixture {}, (a: List[Int], b: List[Int]) => a ++ b)
+    val tuple = (endoMonoidIntToInt, new endoFixture {}, (a: Int => Int , b: Int => Int) => a.compose(b))
 
-    testMonoidRules[List[Int]](tuple)
+    testMonoidRules[Int => Int](tuple)
 
 
-  }*/
+  }
 
 
 }
