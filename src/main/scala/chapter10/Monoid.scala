@@ -3,8 +3,6 @@ package chapter10
 import chapter7.Par
 import chapter7.Par.Par
 
-import scala.collection.immutable
-
 /**
   * A monoid is an algebraic structure, it consist in:
   *
@@ -172,6 +170,14 @@ object Monoid {
       List(stringToDivide.substring(0, length/2), stringToDivide.substring(length / 2, stringToDivide.length))
     }
 
+    def isWord(str: String) = {
+      str != ""
+    }
+
+    val stubToWords = (stub: Stub) => if (isWord(stub.chars)) 1 else 0
+    val partToWords = (part: Part) => stubToWords(Stub(part.lStub)) + stubToWords(Stub(part.lStub)) + part.words
+
+
     val quarter = twoHalves(stringToCount).flatMap(twoHalves)
 
     val wcList = quarter.map(string => WC.parse(string)).toList
@@ -185,13 +191,14 @@ object Monoid {
     wordNumber
   }
 
-  val stubToWords = (stub: Stub) => if (isWord(stub.chars)) 1 else 0
-  val partToWords = (part: Part) => stubToWords(Stub(part.lStub)) + stubToWords(Stub(part.lStub)) + part.words
+  def productMonoid[A,B](A: Monoid[A], B: Monoid[B]): Monoid[(A,B)] = new Monoid[(A, B)] {
+    def op(a1: (A, B), a2: (A, B)): (A, B) = (A.op(a1._1,a2._1),B.op(a1._2,a2._2))
 
-
-  def isWord(str: String) = {
-    str != ""
+    override def zero: (A, B) = (A.zero,B.zero)
   }
+
+
+
 }
 
 
