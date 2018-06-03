@@ -1,7 +1,11 @@
 package chapter11
 
-import chapter6.{RNG, State}
+import chapter6.State
 
+/**
+  *
+  * A functor is an alebraic data structure that contains the map operation
+  */
 trait Functor[F[_]] {
   def map[A, B](fa: F[A])(f: A => B): F[B]
 
@@ -14,6 +18,9 @@ trait Functor[F[_]] {
   }
 }
 
+/**
+  * The monad is more powerful that the function, because it has unit and flatMap.
+  */
 trait Monad[M[_]] extends Functor[M] {
   def unit[A](a: => A): M[A]
 
@@ -62,7 +69,7 @@ object Monad {
     override def flatMap[A, B](ma: IntState[A])(f: A => IntState[B]): IntState[B] = ma.flatMap(f)
   }
 
-  def stateMonad[S]: Monad[State[S, _]] = new Monad[({type lambda[x] = State[S, x]})#lambda] {
+  def stateMonad[S] = new Monad[({type lambda[x] = State[S, x]})#lambda] {
     def unit[A](a: => A): State[S, A] = State(s => (a, s))
 
     override def flatMap[A, B](st: State[S, A])(f: A => State[S, B]): State[S, B] =
@@ -81,8 +88,8 @@ case class Id[A](value: A) {
 case class Reader[R, A](run: R => A)
 
 object Reader {
-  def readerMonad[R]: Monad[Reader[R, _]] = new Monad[({type f[x] = Reader[R, x]})#f] {
-    def unit[A](a: => A): Reader[R, A] = Reader(r => a)
+  def readerMonad[R] = new Monad[({type f[x] = Reader[R, x]})#f] {
+    def unit[A](a: => A): Reader[R, A] = Reader(_ => a)
     def flatMap[A, B](st: Reader[R, A])(f: A => Reader[R, B]): Reader[R, B] = Reader(r => f(st.run(r)).run(r))
   }
 }
