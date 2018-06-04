@@ -1,4 +1,6 @@
-package chapter11
+package chapter12
+
+import chapter11._
 
 trait Applicative[F[_]] extends Functor[F] {
   //primitive combinator are unit and map2
