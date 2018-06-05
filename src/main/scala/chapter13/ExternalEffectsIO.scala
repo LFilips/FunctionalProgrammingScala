@@ -1,5 +1,7 @@
 package chapter13
 
+import AlgebraicDataStructure.AlgebraicDataStructure.Monad
+
 class ExternalEffectsIO {
 
 
@@ -41,7 +43,7 @@ class ExternalEffectsIO {
 
   /**
     * After that i've defined my trait for IO I can define a mehod that uses that dor doing the io
-    */
+
 
   def printLine(line: String): IO = {
     new IO {
@@ -49,18 +51,51 @@ class ExternalEffectsIO {
     }
   }
 
-  /**
+
     * In this way we have an input and output, we are still not having any side effect
+    *
     * @param stringToPrint
     * @return
-    */
   def printSomethingWithIoTrait(stringToPrint: String): IO = {
     printLine(stringToPrint) //this will not actually print anyThing, is just creating the io read for printingIt
   }
 
+  **/
+
 }
 
 
-trait IO {
-  def run: Unit
+trait IO[A] {
+  self =>
+
+  def run: A
+
+  def map[B](f: A => B): IO[B] = {
+    val lifted = (a: A) => { // not sure about that?
+      new IO[B] {
+        override def run: B = f(a)
+      }
+    }
+    flatMap(lifted)
+  }
+
+  def flatMap[B](f: A => IO[B]): IO[B] = new IO[B]{
+    override def run: B = f(self.run).run
+  }
 }
+
+
+object IO extends Monad[IO] {
+  /** flatMap and Unit are the primitive combinator for the Monad **/
+  def unit[A](a: => A): IO[A] = new IO[A] {
+    override def run = a
+  }
+
+  def flatMap[A, B](ma: IO[A])(f: A => IO[B]): IO[B] = ma flatMap f
+
+  def apply[A](a: => A): IO[A] = unit(a)
+
+}
+
+
+

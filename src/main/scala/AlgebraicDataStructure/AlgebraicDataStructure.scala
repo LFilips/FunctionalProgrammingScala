@@ -49,6 +49,8 @@ object AlgebraicDataStructure {
     def traverse[A, B](la: List[A])(f: A => M[B]): M[List[B]] = {
       sequence(la.map(a => f(a)))
     }
+
+    //def apply[A](a: => A): M[A] = unit(a)
   }
 
   /**
